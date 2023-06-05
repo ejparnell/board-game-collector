@@ -1,5 +1,8 @@
-from django.shortcuts import render
-from .models import Game
+from django.shortcuts import render, redirect
+from django.views.generic.edit import CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView
+from .models import Game, Store
+from .forms import PlayForm
 
 # Create your views here.
 # games = [
@@ -37,9 +40,61 @@ def games_index(request):
 def games_detail(request, game_id):
     # create a game variable and assign it to the game objects id
     game = Game.objects.get(id=game_id)
-    return render(request, "games/details.html", {"game": game})
+    id_list = game.stores.all().values_list("id")
+    stores_game_doesnt_have = Store.objects.exclude(id__in=id_list)
+    # instantiate play form class
+    play_form = PlayForm()
+    return render(
+        request,
+        "games/detail.html",
+        {"game": game, "play_form": play_form, "stores": stores_game_doesnt_have},
+    )
 
 
-# [x] I want to be able to navigate to separate pages for about and all games using a navbar
-# [x] When I visit the the about page, I want to view some details about the games application
-# [ ] When I visit the all page, I want to view a list of all games (index view) that displays each attribute of a game
+def add_play(request, game_id):
+    form = PlayForm(request.POST)
+    if form.is_valid():
+        new_play = form.save(commit=False)
+        new_play.game_id = game_id
+        new_play.save()
+    return redirect("detail", game_id=game_id)
+
+
+class GameCreate(CreateView):
+    model = Game
+    fields = "__all__"
+
+
+class GameUpdate(UpdateView):
+    # name your model
+    model = Game
+    # indicate which fields you want to be able to update.
+    fields = ["type", "player_count", "description", "rating"]
+
+
+class GameDelete(DeleteView):
+    model = Game
+    success_url = "/games"
+
+
+class StoreList(ListView):
+    model = Store
+
+
+class StoreCreate(CreateView):
+    model = Store
+    fields = ["name", "type"]
+
+
+class StoreDetail(DetailView):
+    model = Store
+
+
+def assoc_store(request, game_id, store_id):
+    Game.objects.get(id=game_id).stores.add(store_id)
+    return redirect("detail", game_id=game_id)
+
+
+def remove_store(request, game_id, store_id):
+    Game.objects.get(id=game_id).stores.remove(store_id)
+    return redirect("detail", game_id=game_id)
